@@ -182,7 +182,7 @@ async fn fetch_tpex() -> Result<Vec<Stock>> {
 
     // MS950 → UTF-8 解碼
     // encoding_rs 是 reqwest 的依賴，可直接使用
-    let (text, _, _) = encoding_rs::WINDOWS_949.decode(&bytes);
+    let (text, _, _) = encoding_rs::BIG5.decode(&bytes);
 
     let document = Html::parse_document(&text);
     let td_selector = Selector::parse("td").unwrap();

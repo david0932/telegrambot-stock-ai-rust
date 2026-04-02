@@ -3,7 +3,7 @@ FROM rust:1.77-slim AS builder
 WORKDIR /app
 
 # 先複製 Cargo 設定，利用 Docker layer 快取相依性編譯
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 # 建立假的 main.rs 讓 cargo 先下載並編譯相依套件
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release

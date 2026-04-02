@@ -29,8 +29,8 @@ pub fn format_quote(quote: &Quote) -> String {
 
     format!(
         "📊 *{title}*\n\
-         現價：`{price:.2f}` {arrow} {sign}{change:.2f} ({sign}{pct:.2f}%)\n\
-         開/高/低：{open:.2f} / {high:.2f} / {low:.2f}\n\
+         現價：`{price:.2}` {arrow} {sign}{change:.2} ({sign}{pct:.2}%)\n\
+         開/高/低：{open:.2} / {high:.2} / {low:.2}\n\
          成交量：{volume} 張",
         price = quote.price,
         change = quote.change,
@@ -64,10 +64,10 @@ pub fn format_summary(quotes: &[Quote]) -> String {
 pub fn format_alert(quote: &Quote, cond: &AlertCondition) -> String {
     let code = code_from_symbol(&quote.symbol);
     let desc = match cond.kind.as_str() {
-        "price_below"       => format!("跌破 {:.2f} 元", cond.value),
-        "price_above"       => format!("突破 {:.2f} 元", cond.value),
-        "change_pct_above"  => format!("漲幅超過 {:.1f}%", cond.value),
-        "change_pct_below"  => format!("跌幅超過 {:.1f}%", cond.value.abs()),
+        "price_below"       => format!("跌破 {:.2} 元", cond.value),
+        "price_above"       => format!("突破 {:.2} 元", cond.value),
+        "change_pct_above"  => format!("漲幅超過 {:.1}%", cond.value),
+        "change_pct_below"  => format!("跌幅超過 {:.1}%", cond.value.abs()),
         "volume_above"      => format!("成交量超過 {} 張", format_number(cond.value as i64)),
         other               => other.to_string(),
     };

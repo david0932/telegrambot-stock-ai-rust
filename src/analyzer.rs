@@ -115,8 +115,8 @@ fn build_prompt(symbol: &str, quote: &Quote, history: Option<&Vec<DayBar>>) -> S
     };
 
     let instant = format!(
-        "現價：{:.2f} 元，漲跌：{:+.2f}（{:+.2f}%）\n\
-         開盤：{:.2f} / 最高：{:.2f} / 最低：{:.2f}\n\
+        "現價：{:.2} 元，漲跌：{:+.2}（{:+.2}%）\n\
+         開盤：{:.2} / 最高：{:.2} / 最低：{:.2}\n\
          成交量：{} 張",
         quote.price,
         quote.change,
@@ -134,7 +134,7 @@ fn build_prompt(symbol: &str, quote: &Quote, history: Option<&Vec<DayBar>>) -> S
                 .iter()
                 .map(|d| {
                     format!(
-                        "{} | {:.2f} | {:.2f} | {:.2f} | {:.2f} | {}",
+                        "{} | {:.2} | {:.2} | {:.2} | {:.2} | {}",
                         d.date, d.open, d.high, d.low, d.close, d.volume
                     )
                 })

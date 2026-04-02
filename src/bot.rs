@@ -188,8 +188,8 @@ async fn cmd_start(bot: &Bot, msg: &Message, chat_id: &str, state: &State) -> Re
 
     bot.send_message(msg.chat.id, "📋 申請已送出，等待管理員審核。").await?;
 
-    let user = msg.from.as_ref();
-    let name = user.map(|u| u.full_name()).unwrap_or_else(|| chat_id.to_string());
+    let user = msg.from();
+    let name = user.map(|u: &teloxide::types::User| u.full_name()).unwrap_or_else(|| chat_id.to_string());
     let username = user
         .and_then(|u| u.username.as_deref())
         .map(|u| format!("@{}", u))

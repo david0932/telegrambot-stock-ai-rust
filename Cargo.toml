@@ -29,6 +29,9 @@ chrono = { version = "0.4", features = ["serde"] }
 # 錯誤處理
 anyhow = "1"
 
+# 字元編碼（BIG5/WINDOWS-949）
+encoding_rs = "0.8"
+
 # 日誌
 log = "0.4"
 env_logger = "0.11"

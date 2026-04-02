@@ -1,6 +1,6 @@
 services:
   bot:
-    build: .
+    image: ghcr.io/david0932/telegrambot-stock-ai-rust:latest
     restart: unless-stopped
     environment:
       - TZ=Asia/Taipei

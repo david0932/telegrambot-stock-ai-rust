@@ -1,5 +1,10 @@
 FROM rust:slim AS builder
 
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # 先複製 Cargo 設定，利用 Docker layer 快取相依性編譯

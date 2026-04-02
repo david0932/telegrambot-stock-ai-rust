@@ -1,0 +1,11 @@
+{
+  "telegram_token": "YOUR_BOT_TOKEN",
+  "gemini_api_key": "YOUR_GEMINI_API_KEY",
+  "gemini_model": "gemini-2.0-flash",
+  "admin_ids": ["YOUR_CHAT_ID"],
+  "allowed_users": ["YOUR_CHAT_ID"],
+  "schedule": {
+    "interval_minutes": 5,
+    "key_times": ["09:30", "10:30", "12:00", "13:25", "13:30"]
+  }
+}

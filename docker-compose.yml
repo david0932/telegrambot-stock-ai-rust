@@ -1,0 +1,10 @@
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Taipei
+      - RUST_LOG=info
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./users:/app/users

@@ -68,6 +68,7 @@ struct YfResult {
 struct YfMeta {
     symbol: String,
     regular_market_price: Option<f64>,
+    chart_previous_close: Option<f64>,
     previous_close: Option<f64>,
     regular_market_open: Option<f64>,
     regular_market_day_high: Option<f64>,
@@ -128,7 +129,7 @@ pub async fn fetch_quote(symbol: &str) -> Result<Option<Quote>> {
         Some(p) => p,
         None => return Ok(None),
     };
-    let prev_close = match meta.previous_close {
+    let prev_close = match meta.chart_previous_close.or(meta.previous_close) {
         Some(p) => p,
         None => return Ok(None),
     };

@@ -279,7 +279,12 @@ async fn cmd_price(bot: &Bot, msg: &Message, code: &str) -> ResponseResult<()> {
                 .parse_mode(ParseMode::Markdown)
                 .await?;
         }
-        _ => {
+        Ok(None) => {
+            log::warn!("fetch_quote({symbol}): returned None");
+            bot.send_message(msg.chat.id, format!("⚠️ 無法取得 {code} 的資料")).await?;
+        }
+        Err(e) => {
+            log::error!("fetch_quote({symbol}): {e:#}");
             bot.send_message(msg.chat.id, format!("⚠️ 無法取得 {code} 的資料")).await?;
         }
     }

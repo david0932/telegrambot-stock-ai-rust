@@ -52,16 +52,22 @@ where
             .await?;
     }
 
-    // 指定時間點排程（台灣時間，TZ 由 docker-compose 的 TZ=Asia/Taipei 控制）
+    // 指定時間點排程（config 中為台灣時間 UTC+8，轉換為 UTC 再放入 cron）
+    // tokio-cron-scheduler v0.13 以 UTC 評估 cron 表達式，不使用系統 TZ
     for time_str in key_times {
         let parts: Vec<&str> = time_str.split(':').collect();
         if parts.len() != 2 {
             continue;
         }
-        let hour = parts[0];
+        let hour_tw: u32 = match parts[0].parse() {
+            Ok(h) => h,
+            Err(_) => continue,
+        };
         let minute = parts[1];
+        // 台灣時間 UTC+8 → UTC（減 8 小時，modulo 24）
+        let hour_utc = (hour_tw + 24 - 8) % 24;
         // cron 格式：秒 分 時 日 月 週
-        let cron = format!("0 {} {} * * *", minute, hour);
+        let cron = format!("0 {} {} * * *", minute, hour_utc);
 
         let job_fn = key_time_job.clone();
         scheduler

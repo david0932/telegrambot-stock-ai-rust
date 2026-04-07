@@ -8,7 +8,7 @@
 //   歷史日K:  https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=1mo
 
 use anyhow::Result;
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::OnceLock;

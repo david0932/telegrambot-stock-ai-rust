@@ -547,21 +547,26 @@ async fn cmd_users(bot: &Bot, msg: &Message, chat_id: &str, state: &State) -> Re
 
 // ── 定時推播 ─────────────────────────────────────────────────────
 
-/// 判斷目前是否在台灣股市交易時間內（週一至週五 09:00–13:35 UTC+8）
-fn is_taiwan_market_open() -> bool {
+/// 判斷目前是否在台灣股市交易時間內
+/// 條件：週一至週五、非 TWSE 國定假日、09:00–13:00 UTC+8
+async fn is_taiwan_market_open() -> bool {
     use chrono::{Datelike, FixedOffset, Timelike, Utc, Weekday};
     let taipei = FixedOffset::east_opt(8 * 3600).unwrap();
     let now = Utc::now().with_timezone(&taipei);
+
     if matches!(now.weekday(), Weekday::Sat | Weekday::Sun) {
         return false;
     }
+    if crate::fetcher::is_twse_holiday(now.date_naive()).await {
+        return false;
+    }
     let mins = now.hour() * 60 + now.minute();
-    // 09:00 = 540, 13:35 = 815
-    mins >= 540 && mins <= 815
+    // 09:00 = 540, 13:00 = 780
+    mins >= 540 && mins <= 780
 }
 
 async fn push_summary_broadcast(bot: &Bot, state: &State, check_interval: bool) {
-    if !is_taiwan_market_open() {
+    if !is_taiwan_market_open().await {
         return;
     }
     let config = state.lock().await.config.clone();

@@ -8,7 +8,11 @@
 //   歷史日K:  https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=1mo
 
 use anyhow::Result;
+use chrono::NaiveDate;
 use serde::Deserialize;
+use std::collections::HashMap;
+use std::sync::OnceLock;
+use tokio::sync::RwLock;
 
 /// 單一股票即時報價
 ///
@@ -90,6 +94,82 @@ struct YfQuoteData {
     low: Option<Vec<Option<f64>>>,
     close: Option<Vec<Option<f64>>>,
     volume: Option<Vec<Option<i64>>>,
+}
+
+// ── 證交所休市日 ──────────────────────────────────────────────────
+
+static HOLIDAY_CACHE: OnceLock<RwLock<HashMap<i32, Vec<NaiveDate>>>> = OnceLock::new();
+
+fn holiday_cache() -> &'static RwLock<HashMap<i32, Vec<NaiveDate>>> {
+    HOLIDAY_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
+}
+
+#[derive(Deserialize)]
+struct TwseHolidayResp {
+    stat: String,
+    data: Option<Vec<Vec<String>>>,
+}
+
+/// 從 TWSE 取得指定西元年的休市日清單，同一年份只呼叫一次（快取）
+pub async fn fetch_twse_holidays(year: i32) -> Vec<NaiveDate> {
+    {
+        let cache = holiday_cache().read().await;
+        if let Some(dates) = cache.get(&year) {
+            return dates.clone();
+        }
+    }
+
+    let roc_year = year - 1911;
+    let url = format!(
+        "https://www.twse.com.tw/rwd/zh/holidaySchedule/holidaySchedule?response=json&year={}",
+        roc_year
+    );
+
+    let dates = match do_fetch_holidays(&url).await {
+        Ok(d) => d,
+        Err(e) => {
+            log::warn!("無法取得 {year} 年 TWSE 休市日：{e}");
+            vec![]
+        }
+    };
+
+    holiday_cache().write().await.insert(year, dates.clone());
+    dates
+}
+
+async fn do_fetch_holidays(url: &str) -> Result<Vec<NaiveDate>> {
+    let resp = reqwest::Client::new()
+        .get(url)
+        .header("User-Agent", "Mozilla/5.0")
+        .send()
+        .await?;
+
+    let body: TwseHolidayResp = resp.json().await?;
+    if body.stat != "OK" {
+        return Ok(vec![]);
+    }
+
+    let mut dates = vec![];
+    for row in body.data.unwrap_or_default() {
+        // row[0] 格式："114/01/01"（民國年/月/日）
+        let Some(s) = row.first() else { continue };
+        let parts: Vec<&str> = s.split('/').collect();
+        if parts.len() != 3 { continue; }
+        let (Ok(roc_y), Ok(m), Ok(d)) = (
+            parts[0].parse::<i32>(),
+            parts[1].parse::<u32>(),
+            parts[2].parse::<u32>(),
+        ) else { continue };
+        if let Some(date) = NaiveDate::from_ymd_opt(roc_y + 1911, m, d) {
+            dates.push(date);
+        }
+    }
+    Ok(dates)
+}
+
+/// 判斷指定日期是否為 TWSE 休市日（含國定假日與補假）
+pub async fn is_twse_holiday(date: NaiveDate) -> bool {
+    fetch_twse_holidays(date.year()).await.contains(&date)
 }
 
 /// 抓取即時報價

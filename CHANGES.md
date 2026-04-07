@@ -75,3 +75,47 @@ fn is_taiwan_market_open() -> bool {
 
 - `config.json` 的 `key_times` 格式**不變**，仍填寫台灣時間（如 `"09:30"`）
 - 台灣無夏令時間（DST），UTC+8 為固定偏移，轉換結果永久有效
+
+---
+
+## feat: 加入 TWSE 國定假日檢查與修正交易時間
+
+### 問題描述
+
+1. **未檢查國定假日**：週一至週五的例假日（春節、清明、端午等）仍會觸發推播
+2. **交易時間上限錯誤**：台灣股市收盤為 13:00，程式設定為 13:35
+
+### 修改內容
+
+#### `src/fetcher.rs`
+
+新增 TWSE 休市日查詢功能：
+
+```
+API：https://www.twse.com.tw/rwd/zh/holidaySchedule/holidaySchedule?response=json&year={民國年}
+```
+
+- `fetch_twse_holidays(year)` — 取得指定年份所有休市日，以年份為 key 快取於記憶體
+- `is_twse_holiday(date)` — 判斷指定日期是否為休市日
+- 民國年格式（`"114/01/01"`）自動轉換為西元 `NaiveDate`
+- API 呼叫失敗時回傳空清單（寧可推播，不漏推）
+
+#### `src/bot.rs`
+
+`is_taiwan_market_open()` 改為 `async`，判斷流程更新為四層：
+
+```
+1. 週六／週日？         → 休市
+2. TWSE 休市日清單？    → 休市（含國定假日、補假）
+3. 非 09:00～13:00？   → 盤前或盤後
+4. 以上全部通過        → 交易中，允許推播
+```
+
+交易時間上限從 `13:35` 修正為 `13:00`。
+
+### 影響範圍
+
+| 檔案 | 變更類型 |
+|---|---|
+| `src/fetcher.rs` | 新功能 — TWSE 休市日 API 查詢與快取 |
+| `src/bot.rs` | Bug fix — 假日判斷、收盤時間修正 |

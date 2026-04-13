@@ -214,6 +214,19 @@ pub async fn fetch_quote(symbol: &str) -> Result<Option<Quote>> {
         None => return Ok(None),
     };
 
+    // meta.regular_market_open 部分個股（尤其上櫃）會回傳 null，
+    // fallback 到 indicators 當日第一筆開盤價
+    let open = meta.regular_market_open.unwrap_or_else(|| {
+        result.indicators
+            .as_ref()
+            .and_then(|ind| ind.quote.as_ref())
+            .and_then(|q| q.first())
+            .and_then(|q| q.open.as_ref())
+            .and_then(|o| o.first())
+            .and_then(|v| *v)
+            .unwrap_or(0.0)
+    });
+
     let change = price - prev_close;
     let change_pct = (change / prev_close) * 100.0;
     let name = meta.long_name
@@ -224,7 +237,7 @@ pub async fn fetch_quote(symbol: &str) -> Result<Option<Quote>> {
         symbol: symbol.to_string(),
         name,
         price,
-        open: meta.regular_market_open.unwrap_or(0.0),
+        open,
         high: meta.regular_market_day_high.unwrap_or(0.0),
         low: meta.regular_market_day_low.unwrap_or(0.0),
         volume: meta.regular_market_volume.unwrap_or(0) / 1000,

@@ -49,37 +49,49 @@ pub struct DayBar {
     pub volume: i64,
 }
 
-// Yahoo Finance API 回應的 JSON 結構（只取需要的欄位）
+// ── v7/finance/quote 即時報價 JSON 結構 ───────────────────────
 #[derive(Deserialize)]
-struct YfResponse {
+#[serde(rename_all = "camelCase")]
+struct YfQuoteResponse {
+    quote_response: YfQuoteResult,
+}
+
+#[derive(Deserialize)]
+struct YfQuoteResult {
+    result: Option<Vec<YfQuoteItem>>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct YfQuoteItem {
+    symbol: String,
+    long_name: Option<String>,
+    short_name: Option<String>,
+    regular_market_price: Option<f64>,
+    regular_market_open: Option<f64>,
+    regular_market_day_high: Option<f64>,
+    regular_market_day_low: Option<f64>,
+    regular_market_volume: Option<i64>,
+    regular_market_previous_close: Option<f64>,
+    regular_market_change: Option<f64>,
+    regular_market_change_percent: Option<f64>,
+}
+
+// ── v8/finance/chart 歷史 K 線 JSON 結構 ──────────────────────
+#[derive(Deserialize)]
+struct YfChartResponse {
     chart: YfChart,
 }
 
 #[derive(Deserialize)]
 struct YfChart {
-    result: Option<Vec<YfResult>>,
+    result: Option<Vec<YfChartResult>>,
 }
 
 #[derive(Deserialize)]
-struct YfResult {
-    meta: YfMeta,
+struct YfChartResult {
     timestamp: Option<Vec<i64>>,
     indicators: Option<YfIndicators>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct YfMeta {
-    symbol: String,
-    regular_market_price: Option<f64>,
-    chart_previous_close: Option<f64>,
-    previous_close: Option<f64>,
-    regular_market_open: Option<f64>,
-    regular_market_day_high: Option<f64>,
-    regular_market_day_low: Option<f64>,
-    regular_market_volume: Option<i64>,
-    long_name: Option<String>,
-    short_name: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -172,18 +184,10 @@ pub async fn is_twse_holiday(date: NaiveDate) -> bool {
     fetch_twse_holidays(date.year()).await.contains(&date)
 }
 
-/// 抓取即時報價
-///
-/// # 對應 Python
-/// ```python
-/// def fetch_quote(symbol: str) -> dict | None:
-///     ticker = yf.Ticker(symbol)
-///     info = ticker.info
-///     ...
-/// ```
+/// 抓取即時報價（使用 v7/finance/quote，資料與 Yahoo 網頁一致）
 pub async fn fetch_quote(symbol: &str) -> Result<Option<Quote>> {
     let url = format!(
-        "https://query1.finance.yahoo.com/v8/finance/chart/{}?interval=1d&range=1d",
+        "https://query1.finance.yahoo.com/v7/finance/quote?symbols={}",
         symbol
     );
 
@@ -198,48 +202,34 @@ pub async fn fetch_quote(symbol: &str) -> Result<Option<Quote>> {
         return Ok(None);
     }
 
-    let data: YfResponse = resp.json().await?;
-    let result = match data.chart.result.and_then(|mut r| r.pop()) {
+    let data: YfQuoteResponse = resp.json().await?;
+    let item = match data.quote_response.result.and_then(|mut r| r.pop()) {
         Some(r) => r,
         None => return Ok(None),
     };
 
-    let meta = result.meta;
-    let price = match meta.regular_market_price {
+    let price = match item.regular_market_price {
         Some(p) => p,
         None => return Ok(None),
     };
-    let prev_close = match meta.chart_previous_close.or(meta.previous_close) {
+    let prev_close = match item.regular_market_previous_close {
         Some(p) => p,
         None => return Ok(None),
     };
 
-    // meta.regular_market_open 部分個股（尤其上櫃）會回傳 null，
-    // fallback 到 indicators 當日第一筆開盤價
-    let open = meta.regular_market_open.unwrap_or_else(|| {
-        result.indicators
-            .as_ref()
-            .and_then(|ind| ind.quote.as_ref())
-            .and_then(|q| q.first())
-            .and_then(|q| q.open.as_ref())
-            .and_then(|o| o.first())
-            .and_then(|v| *v)
-            .unwrap_or(0.0)
-    });
-
-    let change = price - prev_close;
-    let change_pct = (change / prev_close) * 100.0;
-    let name = meta.long_name
-        .or(meta.short_name)
+    let change = item.regular_market_change.unwrap_or(price - prev_close);
+    let change_pct = item.regular_market_change_percent.unwrap_or_else(|| (change / prev_close) * 100.0);
+    let name = item.long_name
+        .or(item.short_name)
         .unwrap_or_else(|| symbol.replace(".TWO", "").replace(".TW", ""));
 
     Ok(Some(Quote {
-        symbol: symbol.to_string(),
+        symbol: item.symbol,
         name,
         price,
-        open,
-        high: meta.regular_market_day_high.unwrap_or(0.0),
-        low: meta.regular_market_day_low.unwrap_or(0.0),
+        open: item.regular_market_open.unwrap_or(0.0),
+        high: item.regular_market_day_high.unwrap_or(0.0),
+        low: item.regular_market_day_low.unwrap_or(0.0),
         volume: meta.regular_market_volume.unwrap_or(0) / 1000,
         change: (change * 100.0).round() / 100.0,
         change_pct: (change_pct * 100.0).round() / 100.0,
@@ -272,7 +262,7 @@ pub async fn fetch_history(symbol: &str, days: usize) -> Result<Option<Vec<DayBa
         return Ok(None);
     }
 
-    let data: YfResponse = resp.json().await?;
+    let data: YfChartResponse = resp.json().await?;
     let result = match data.chart.result.and_then(|mut r| r.pop()) {
         Some(r) => r,
         None => return Ok(None),

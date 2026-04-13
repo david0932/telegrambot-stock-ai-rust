@@ -11,8 +11,12 @@ use std::fs;
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     pub telegram_token: String,
+    /// AI 提供者："gemini" 或 "groq"
+    pub ai_provider: String,
     pub gemini_api_key: String,
     pub gemini_model: String,
+    pub groq_api_key: String,
+    pub groq_model: String,
     pub admin_ids: Vec<String>,
     pub allowed_users: Vec<String>,
     pub schedule: ScheduleConfig,

@@ -1,7 +1,10 @@
 {
   "telegram_token": "YOUR_BOT_TOKEN",
+  "ai_provider": "groq",
   "gemini_api_key": "YOUR_GEMINI_API_KEY",
   "gemini_model": "gemini-2.0-flash",
+  "groq_api_key": "YOUR_GROQ_API_KEY",
+  "groq_model": "llama-3.3-70b-versatile",
   "admin_ids": ["YOUR_CHAT_ID"],
   "allowed_users": ["YOUR_CHAT_ID"],
   "schedule": {

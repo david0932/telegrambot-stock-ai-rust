@@ -1,18 +1,18 @@
-// analyzer.rs - Gemini AI 技術分析
+// analyzer.rs - AI 技術分析（支援 Gemini / Groq 切換）
 //
-// 對應 Python 的 src/analyzer.py
-// 沒有官方 Rust SDK，直接呼叫 Gemini REST API
+// 透過 config.json 的 ai_provider 欄位決定使用哪個 AI 服務：
+//   "gemini" → Google Gemini REST API
+//   "groq"   → Groq OpenAI 相容 API
 
 use crate::fetcher::{DayBar, Quote};
 use crate::searcher::code_from_symbol;
-use anyhow::Result;
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 
-// Gemini API endpoint
-// 文件：https://ai.google.dev/api/generate-content
 const GEMINI_BASE: &str = "https://generativelanguage.googleapis.com/v1beta/models";
+const GROQ_BASE: &str = "https://api.groq.com/openai/v1/chat/completions";
 
-// ── Gemini API 請求/回應 JSON 結構 ──────────────────────────────
+// ── Gemini API 結構 ────────────────────────────────────────────
 
 #[derive(Serialize)]
 struct GeminiRequest {
@@ -49,31 +49,62 @@ struct GeminiResponsePart {
     text: String,
 }
 
+// ── Groq API 結構（OpenAI 相容）───────────────────────────────
+
+#[derive(Serialize)]
+struct GroqRequest {
+    model: String,
+    messages: Vec<GroqMessage>,
+}
+
+#[derive(Serialize)]
+struct GroqMessage {
+    role: String,
+    content: String,
+}
+
+#[derive(Deserialize)]
+struct GroqResponse {
+    choices: Vec<GroqChoice>,
+}
+
+#[derive(Deserialize)]
+struct GroqChoice {
+    message: GroqResponseMessage,
+}
+
+#[derive(Deserialize)]
+struct GroqResponseMessage {
+    content: String,
+}
+
 // ── 公開 API ───────────────────────────────────────────────────
 
-/// 呼叫 Gemini 進行技術分析
+/// 依據 provider 呼叫對應 AI 進行技術分析
 ///
-/// # 對應 Python
-/// ```python
-/// def analyze(symbol, quote, history, api_key, model) -> str:
-///     client = genai.Client(api_key=api_key)
-///     prompt = build_prompt(symbol, quote, history)
-///     response = client.models.generate_content(...)
-///     return response.text
-/// ```
+/// provider: "gemini" 或 "groq"
 pub async fn analyze(
     symbol: &str,
     quote: &Quote,
     history: Option<&Vec<DayBar>>,
+    provider: &str,
     api_key: &str,
     model: &str,
 ) -> Result<String> {
     let prompt = build_prompt(symbol, quote, history);
+    match provider {
+        "gemini" => call_gemini(&prompt, api_key, model).await,
+        "groq" => call_groq(&prompt, api_key, model).await,
+        other => bail!("未知的 ai_provider：{other}，請設定為 \"gemini\" 或 \"groq\""),
+    }
+}
+
+async fn call_gemini(prompt: &str, api_key: &str, model: &str) -> Result<String> {
     let url = format!("{}/{}:generateContent?key={}", GEMINI_BASE, model, api_key);
 
     let request = GeminiRequest {
         contents: vec![GeminiContent {
-            parts: vec![GeminiPart { text: prompt }],
+            parts: vec![GeminiPart { text: prompt.to_string() }],
         }],
     };
 
@@ -98,13 +129,38 @@ pub async fn analyze(
     Ok(text)
 }
 
-/// 組裝分析 Prompt
-///
-/// # 對應 Python
-/// ```python
-/// def build_prompt(symbol, quote, history) -> str:
-///     ...
-/// ```
+async fn call_groq(prompt: &str, api_key: &str, model: &str) -> Result<String> {
+    let request = GroqRequest {
+        model: model.to_string(),
+        messages: vec![GroqMessage {
+            role: "user".to_string(),
+            content: prompt.to_string(),
+        }],
+    };
+
+    let client = reqwest::Client::new();
+    let resp: GroqResponse = client
+        .post(GROQ_BASE)
+        .bearer_auth(api_key)
+        .json(&request)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+
+    let text = resp
+        .choices
+        .into_iter()
+        .next()
+        .map(|c| c.message.content)
+        .unwrap_or_else(|| "無法取得分析結果".to_string());
+
+    Ok(text)
+}
+
+// ── Prompt 組裝 ────────────────────────────────────────────────
+
 fn build_prompt(symbol: &str, quote: &Quote, history: Option<&Vec<DayBar>>) -> String {
     let code = code_from_symbol(symbol);
     let name = &quote.name;

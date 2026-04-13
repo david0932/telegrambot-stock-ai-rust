@@ -396,18 +396,19 @@ async fn cmd_summary(bot: &Bot, msg: &Message, chat_id: &str) -> ResponseResult<
 }
 
 async fn cmd_analyze(bot: &Bot, msg: &Message, chat_id: &str, arg: &str, state: &State) -> ResponseResult<()> {
-    let api_key = {
+    let (provider, api_key, model) = {
         let st = state.lock().await;
-        st.config.gemini_api_key.clone()
+        let provider = st.config.ai_provider.clone();
+        let (api_key, model) = match provider.as_str() {
+            "groq" => (st.config.groq_api_key.clone(), st.config.groq_model.clone()),
+            _ => (st.config.gemini_api_key.clone(), st.config.gemini_model.clone()),
+        };
+        (provider, api_key, model)
     };
-    if api_key.is_empty() || api_key == "YOUR_GEMINI_API_KEY" {
-        bot.send_message(msg.chat.id, "⚠️ 請先在 config.json 設定 gemini_api_key").await?;
+    if api_key.is_empty() || api_key.starts_with("YOUR_") {
+        bot.send_message(msg.chat.id, format!("⚠️ 請先在 config.json 設定 {provider} 的 api_key")).await?;
         return Ok(());
     }
-    let model = {
-        let st = state.lock().await;
-        st.config.gemini_model.clone()
-    };
 
     let user = get_user(chat_id);
     let symbols: Vec<String> = if arg.trim().is_empty() {
@@ -432,7 +433,7 @@ async fn cmd_analyze(bot: &Bot, msg: &Message, chat_id: &str, arg: &str, state: 
         bot.send_message(msg.chat.id, format!("⏳ 正在分析 {display}，請稍候...")).await?;
 
         let history = fetch_history(symbol, 10).await.ok().flatten();
-        match analyzer::analyze(symbol, &quote, history.as_ref(), &api_key, &model).await {
+        match analyzer::analyze(symbol, &quote, history.as_ref(), &provider, &api_key, &model).await {
             Ok(result) => { bot.send_message(msg.chat.id, result).await?; }
             Err(e) => { bot.send_message(msg.chat.id, format!("⚠️ AI 分析失敗：{e}")).await?; }
         }

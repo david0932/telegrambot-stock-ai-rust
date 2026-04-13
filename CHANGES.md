@@ -1,5 +1,49 @@
 # 修改記錄
 
+## 2026-04-13
+
+### feat: 支援 Gemini / Groq AI 切換
+
+**背景：** 伺服器（Scloud Pte Ltd，台灣）被 Google Gemini API 封鎖，回傳 `User location is not supported for the API use.`
+
+**修改內容：**
+
+新增 `ai_provider` 欄位，可在 `config.json` 切換 AI 服務，無需重新編譯：
+
+```json
+{
+  "ai_provider": "groq",
+  "gemini_api_key": "...",
+  "gemini_model": "gemini-2.0-flash",
+  "groq_api_key": "...",
+  "groq_model": "llama-3.3-70b-versatile"
+}
+```
+
+- `"gemini"` → Google Gemini REST API（`/v1beta/models/{model}:generateContent`）
+- `"groq"` → Groq OpenAI 相容 API（`/openai/v1/chat/completions`）
+
+| 檔案 | 變更類型 |
+|---|---|
+| `src/analyzer.rs` | 新功能 — 雙 provider 支援，`call_gemini` / `call_groq` 分離 |
+| `src/config.rs` | 新增 `ai_provider`、`groq_api_key`、`groq_model` 欄位 |
+| `src/bot.rs` | 依 `ai_provider` 選取對應 key / model |
+| `config.json.example` | 更新範例格式 |
+
+---
+
+### fix: 開盤價 fallback 到 indicators 第一筆資料
+
+**問題：** 部分個股（尤其上櫃）Yahoo Finance 的 `regularMarketOpen` 回傳 `null`，導致開盤價顯示 `0.00`。
+
+**修改：** `fetch_quote` 在 `regular_market_open` 為 null 時，改從 `indicators.quote[0].open[0]` 取第一筆值。
+
+| 檔案 | 變更類型 |
+|---|---|
+| `src/fetcher.rs` | Bug fix — 開盤價 fallback 邏輯 |
+
+---
+
 ## fix: 修正定時推播時區錯誤與休市仍推播的問題
 
 ### 問題描述

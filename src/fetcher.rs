@@ -230,7 +230,7 @@ pub async fn fetch_quote(symbol: &str) -> Result<Option<Quote>> {
         open: item.regular_market_open.unwrap_or(0.0),
         high: item.regular_market_day_high.unwrap_or(0.0),
         low: item.regular_market_day_low.unwrap_or(0.0),
-        volume: meta.regular_market_volume.unwrap_or(0) / 1000,
+        volume: item.regular_market_volume.unwrap_or(0) / 1000,
         change: (change * 100.0).round() / 100.0,
         change_pct: (change_pct * 100.0).round() / 100.0,
     }))
